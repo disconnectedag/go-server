@@ -16,6 +16,8 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	jwtSecret      string
+	polkaKey	   string
 }
 
 func main() {
@@ -27,6 +29,14 @@ func main() {
 	if dbURL == "" {
 		log.Fatal("DB_URL must be set")
 	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET must be set")
+	}
+	polkaKey := os.Getenv("POLKA_KEY")
+	if polkaKey == "" {
+		log.Fatal("JWT_SECRET must be set")
+	}
 	platform := os.Getenv("PLATFORM")
 	if platform == "" {
 		log.Fatal("DB_URL must be set")
@@ -37,7 +47,7 @@ func main() {
 	}
 	const port = "8080"
 	dbQueries := database.New(db)
-	apiCfg := apiConfig{db: dbQueries, platform: platform}
+	apiCfg := apiConfig{db: dbQueries, platform: platform, jwtSecret: jwtSecret, polkaKey: polkaKey}
 
 	mux := http.NewServeMux()
 	fsHandler := apiCfg.middlewareMetricsInc(http.FileServer(http.Dir(".")))
@@ -47,8 +57,14 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", apiCfg.createChirpHandler)
 	mux.HandleFunc("GET /api/chirps", apiCfg.getAllChirpsHandler)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.getOneChirpHandler)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.deleteChirpHandler)
 
 	mux.HandleFunc("POST /api/users", apiCfg.createUsersHandler)
+	mux.HandleFunc("POST /api/login", apiCfg.loginUserHandler)
+	mux.HandleFunc("POST /api/refresh", apiCfg.refreshTokenHandler)
+	mux.HandleFunc("POST /api/revoke", apiCfg.revokeTokenHandler)
+	mux.HandleFunc("PUT /api/users", apiCfg.updatePasswordHandler)
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.upgradeToRedHandler)
 
 	mux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
